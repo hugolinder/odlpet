@@ -1,95 +1,45 @@
-import numpy as np 
+class packet_part:
+    def __init__(self, lowbit, hightbit, value=None):
+        self.lowbit = lowbit
+        self.highbit = highbit
+        self.value = value
+        self.mask = get_mask(lowbit, highbit)
 
-def is_event(listmode):
-    tag = (listmode >> 31) & 1
-    return tag == 0
-    
-def get_events(listmode):
-    return listmode[is_event(listmode)]
+    def evaluate(self, number):
+        return (self.mask & number) >> lowbit
 
-def is_timetag(listmode):
-    """ is_timetag: must be a tag, and a timetag
-    input: listmode data
-    return bool array indicating time tags in listmode data"""
-    conditions = np.zeros((2, len(listmode)), dtype=np.bool)
-    #is tag
-    conditions[0] = is_event(listmode) == False
-    #is time
-    conditions[1] = ((listmode >> 28) & 0Xe) == 8
-    return np.all(conditions, axis=0)
+    def compare(self, number):
+        return evaluate(number) == self.value
 
-def get_timetag_indices(listmode):
-    """ timetag_indices: 1d indices into petlink data list
-    return: np.nonzero(is_timetag(listmode))[0] """
-    return np.nonzero(is_timetag(listmode))[0]
+def get_mask(lowbit, highbit):
+    """ 1s from lowbit (LSB) to highbit (MSB), 0 elsewhere. Example, get_mask(1,2) --> 110 (binary)  """
+    size = highbit + 1 - lowbit
+    mask = 1
+    mask = (mask << size) - 1
+    return mask << lowbit
 
-def get_timeslice_indices(timetags, timestep):
-    """ timeslice_indices: where to split the data for the timeslices.
-    each timeslice will have at least timestep timetags (last slice possibly more) 
-    the petlink timetags are for preceding data, at time 1 ms, ..., time N ms (end of scan)
-    return timetags[timestep-1: -timestep:timestep] """
-    return timetags[timestep: -timestep:timestep]
+EVENT = packet_part(31, 31, 0)
 
-def is_prompt(events):
-    """ a bool array indicating prompts in LM events"""
-    return (events >> 30) & 1 == 1
+PROMPT = packet_part(30, 30, 1)
 
-def get_prompts(events):
-    """ takes numpy array of 32 bit listmode data with events and only returns the prompts (that is, delays removed)"""
-    return events[is_prompt(events)]
+BIN_ADDRESS = packet_part(0, 29)
 
-def is_delay(events):
-    """ a bool array indicating delays in LM events"""
-    return is_prompt(events) == False
+TIME_TAG = packet_part(30, 31, 0b10)
 
-def get_delays(events):
-    """ takes numpy array of 32 bit listmode data with events and only returns the delays (that is, prompts removed)"""
-    return events[is_delays(events)]
+TIME_MS = packet_part(0, 28) # relative to 1970
 
-def get_bin_address(events):
-    """ extract the 1D bin adress bits of LM events ,
-    0X3FFFFFFF is in binary: 00111...111 (32 bits, 2 0s in front)
-    return events & 0X3FFFFFFF """
-    return events & 0X3FFFFFFF
+MOTION_TAG = packet_part(29, 31, 0b110)
 
-def binary_to_string(number):
-    return '{0:b}'.format(number)
+IS_HORIZONTAL_BED = packet_part(31-8, 31, 0b11000100)
 
-#Thank you Siemens 4 ring mCT walkthrough. (code demonstrating unravel details)
-def get_tof_lor_bins(events, shape):
-    """ get_tof_lor_bins: get bin addresses and unravel to shape
-    extract [tofbin,mi,tx,robin] bin
-    formula: event = 1*robin+c1*tx+c1*c2*mi+c1*c2*c3*tof 
-    robin = ro - minimum(ro)
-    input: events (tags and prompt bits 31,30 can remain in input, they are removed) (np.uint32)
-        shape (of projection space), 
-    return: coordinates """
-    
-    ba = get_bin_address(events)
-    coordinates = np.unravel_index(ba, shape, order='C')
-    coordinates = np.squeeze(np.array(coordinates))
-    return coordinates
+HORIZONTAL_BED_POSITION = packet_part(0, 19) # units of 10 mikro-meter
 
-#Thank you Siemens 4 ring mCT walkthrough. (code demonstrating unravel details)
-def get_histogram_bins(events, shape,verbose=False):
-    """ projection_bins: get bin addresses and unravel to shape
-    extract [tofbin,mi,tx,robin] bin
-    formula: event = 1*robin+c1*tx+c1*c2*mi+c1*c2*c3*tof 
-    robin = ro - minimum(ro)
-    input: events (tags and prompt bits 31,30 can remain in input, they are removed) (np.uint32)
-        shape (of projection space), 
-    return: coordinates """
+IS_HORIZONTAL_MOVING = packet_part(19+1, 19+1, 1) # "This bit was requested but implementation may be pending." (PetLink)
 
-    ba = np.array(get_bin_address(events), dtype = int)
-    sizes = np.cumprod(np.flip(shape))
-    SINOW = sizes[0]
-    sino_sz = sizes[1]
-    mich_sz = sizes[2]
-    
-    tof = ba // mich_sz    
-    sn = (ba - (tof * mich_sz)) // sino_sz    
-    si = (ba - (tof * mich_sz)) - (sn * sino_sz)    
-    tx_ang = si // SINOW
-    robin = si - (tx_ang * SINOW)
+IS_VERTICAL_BED = packet_part(31-8, 31, 0b11000011) 
 
-    return np.array([tof,sn,tx_ang,robin])
+VERTICAL_BED_POSITION = packet_part(0, 13) # unknown units
+
+MONITORING_TAG = packet_part(28, 31, 0b1110)
+
+CONTROL_TAG = packet_part(27, 31, 0b1111)
