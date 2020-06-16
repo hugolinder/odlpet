@@ -35,6 +35,14 @@ BIN_ADDRESS = packet_part(0, 29)
 
 TIME_TAG = packet_part(31-1, 31, 0b10)
 
+ELAPSED_TIME_MARKER = packet_part(31-2, 31, 0b100)
+
+DEAD_TIME_MARKER = packet_part(31-2, 31, 0b101)
+
+DEAD_TIME_BLOCK = packet_part(19,19+9)
+
+DEAD_TIME_SINGLES_RATE = packet_part(0, 18)
+
 TIME_MS = packet_part(0, 28) # relative to 1970
 
 MOTION_TAG = packet_part(31-2, 31, 0b110)
@@ -43,7 +51,7 @@ IS_HORIZONTAL_BED = packet_part(31-7, 31, 0b11000100)
 
 HORIZONTAL_BED_POSITION = packet_part(0, 19) # units of 10 mikro-meter
 
-IS_HORIZONTAL_MOVING = packet_part(19+1, 19+1, 1) # "This bit was requested but implementation may be pending." (PetLink)
+IS_HORIZONTAL_MOVING = packet_part(19+1, 19+1, 1) # "This bit was requested but implementation may be pending." (PetLink) # not in VG60
 
 IS_VERTICAL_BED = packet_part(31-7, 31, 0b11000011) 
 
