@@ -1,6 +1,30 @@
+class packet:
+    def __init__(self, id_part, value_parts, name="packet part"):
+        self.id_part = id_part
+        self.value_parts = values
+        self.name = name
+
+    def __repr__(self):
+        names = [self.name]
+        names.append(id_part)
+        for k, part in self.value_parts:
+            names.append(part)
+        return "\n".join(names)
+
+    def compare(self, number):
+        return self.id_part.compare(number)
+
+    def evaluate(self, number):
+        values = []
+        for part in value_parts:
+            values.append(part.evaluate(number))
+        return values
+
 class packet_part:
-    def __init__(self, lowbit, highbit, value=None, name="packet part"):
+    def __init__(self, lowbit, highbit=None, value=None, name="packet part"):
         self.lowbit = lowbit
+        if highbit is None:
+            highbit = lowbit
         self.highbit = highbit
         self.value = value
         self.mask = get_mask(lowbit, highbit)
@@ -18,7 +42,7 @@ class packet_part:
         names.append("high bit = {}".format(self.highbit))
         if self.value is not None:
             names.append("value = {0:b} (base 2)".format(self.value))
-        names.append("mask = {0:b}".format(self.mask))
+        names.append("mask = {}".format(nibble_string(self.mask)))  
         return "\n".join(names)
 
 def get_mask(lowbit, highbit):
@@ -27,6 +51,23 @@ def get_mask(lowbit, highbit):
     mask = 1
     mask = (mask << size) - 1
     return mask << lowbit
+
+def nibble_string(number, nbits=32):
+    """ string representation of bits, with nibbles (4 bit chunks) separated by blank spaces """
+    number2 = number + (1 << (nbits)) # add a leading 1, so that leading 0's will be included
+    res = "{0:b}".format(number2)[1:]  # remove leading 1
+    offset = nbits % 4
+    pre_nibble = [res[:offset]]
+    size_nibbles = (nbits//4)
+    nibbles =  [res[(offset+4*n):(offset + 4*(n+1))] for n in range(size_nibbles)]
+    res = pre_nibble + nibbles
+    return " ".join(res)
+ 
+def sign_extend(number, nbits):
+    """ convert a 2's complement natural number to the corresponding integer """
+    signbit = (number >> (nbits-1)) & 1
+    return signbit*(number - (1 << nbits)) + (signbit == 0)*number
+
 
 #   PETLink documentation, start at page 4
 #   3.1 Overview, page 4
@@ -62,5 +103,17 @@ VERTICAL_BED_POSITION = packet_part(0, 13) # unknown units
 #   skip source axial position and rotation, page 9
 #   skip HRRT single photon source position
 #   skip 3.2.3
+BASIC_GATING = packet_part(31-4, 31, 0b11100)
+BASIG_GATING_EXPANSION_FORMAT_CONTROL = packet_part(31-7,31-5)
+BASIC_GATING_E0_G = packet_part(0, 7)
+BASIC_GATING_E0_D = packet_part(0, 5) 
+# Physiological Data (e.g. Respiratory Phase) Field: 0-5. 
+# D content only has validity if flag bit P=1
+BASIC_GATING_E0_P = packet_part(6) 
+# Physiological (e.g. Respiratory) Flag Bit – High Tru
+BASIC_GATING_E0_C = packet_part(7) 
+# Cardiac “R Wave” Flag Bit – High True. This bit is intended to be the primary trigger control 
+# for driving the automatic FPGA-driven Gating Buffer switching in designs such as the Smart DRAM.
+
 #   skip 3.2.4 page 12
 
