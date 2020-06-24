@@ -1,11 +1,18 @@
 class document_section:
-    def __init__(self, name, packets):
+    def __init__(self, name, packets, pages = None):
         self.packets = packets
         self.name = name
+        self.pages = pages
 
     def __repr__(self):
         names = [self.name]
-        return "section(name = {}\n, packets = \n{}\n)".format(self.name, "\n".join([packet.name for packet in self.packets]))
+        packet_names = "\n".join([packet.name for packet in self.packets])
+        context = "section({} )"
+        attributes= "name = {}\n, packets = \n{}".format(self.name, packet_names)
+        if self.pages is not None:
+            attributes = attributes + "\n, pages = {}".format(self.pages)
+                                
+        return context.format(attributes)
 
 class packet:
     def __init__(self, instruction, packet_name = None, part_names = None, is_twos_complement = None):
