@@ -71,6 +71,7 @@ class packet_part:
         if highbit is None:
             highbit = lowbit
         self.highbit = highbit
+        self.nbits = highbit - lowbit + 1
         self.value = value
         self.mask = get_mask(lowbit, highbit)
         self.name = name
@@ -82,7 +83,7 @@ class packet_part:
             is_twos_complement = self.is_twos_complement
         value = (self.mask & number) >> self.lowbit
         if is_twos_complement:
-            value = sign_extend(value)
+            value = sign_extend(value, self.nbits)
         return value
 
     def compare(self, number):
@@ -92,7 +93,7 @@ class packet_part:
         names = []
         if self.name is not None:
             names.append(self.name)
-        names.append( "(lowbit, highbit) = {}".format( (self.lowbit, self.highbit) ) )
+        names.append( "(lowbit, highbit, nbits) = {}".format( (self.lowbit, self.highbit, self.nbits) ) )
         if self.value is not None:
             names.append("value = {0:b} (base 2)".format(self.value))
         if self.is_twos_complement:
