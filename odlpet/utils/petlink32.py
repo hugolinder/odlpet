@@ -1,19 +1,16 @@
 class packet:
-    # petlink_doc_string (for construction) 
-    # packet parts, fixed or variable
-    #       id, values
-    # name
-    # field names
-    # twos_complement (for evaluation) 
-    # 
-
-    def __init__(self, PETLink_doc_str, packet_name = None, part_names = None, twos_complement = None):
-        self.PETLink_doc_str = PETLink_doc_str
+    def __init__(self, instruction, packet_name = None, part_names = None, is_twos_complement = None):
+        instruction_lines = instruction.split("\n")
+        if len(instruction_lines) > 1: # alternative input format
+            packet_name = instruction_lines[0]
+            instruction = instruction_lines[1]
+            part_names = instruction_lines[2:]
+        self.instruction = instruction
         self.part_names = part_names
-        self.twos_complement = twos_complement
+        self.is_twos_complement = is_twos_complement
         self.name = packet_name
         #parse doc string, create parts
-        instruction = PETLink_doc_str.replace(" ", "")
+        instruction = instruction.replace(" ", "")
         self.len = len(instruction)
         if self.len != 32:
             print("warning, instruction length does not indicate 32 bit packet")
@@ -43,15 +40,18 @@ class packet:
             is_value = (part_char == '1' ) | (part_char == '0' )
             value = int(part, base=2) if is_value else None
             self.parts.append(packet_part(lowbit, highbit, value))
-        # finally, naming
+        # finally, naming and twos_complement
         if self.part_names is not None:
             for part, name in zip(self.parts, self.part_names):
                 part.name = name
+        if self.is_twos_complement is not None:
+            for is_signed, part in zip(self.is_twos_complement, self.parts):
+                part.is_twos_complement = is_signed
 
     def __repr__(self):
         parts_info = [part.__repr__() for part in self.parts]
         parts_info = "\n---\n".join(parts_info)
-        return "packet(name = {}\nPETLink_doc_str = {}\nparts = \n{})".format(self.name, self.PETLink_doc_str, parts_info)
+        return "packet(name = {}\ninstruction = {}\nparts = \n{})".format(self.name, self.instruction, parts_info)
         
     def compare(self, number):
         """ compares with all value parts, returns True when all value parts compare True. """
@@ -66,7 +66,7 @@ class packet:
         return [part.evaluate(number) for part in self.parts]
 
 class packet_part:
-    def __init__(self, lowbit, highbit=None, value=None, name=None):
+    def __init__(self, lowbit, highbit=None, value=None, name=None, is_twos_complement = False):
         self.lowbit = lowbit
         if highbit is None:
             highbit = lowbit
@@ -74,9 +74,14 @@ class packet_part:
         self.value = value
         self.mask = get_mask(lowbit, highbit)
         self.name = name
+        self.is_twos_complement = is_twos_complement
 
     def evaluate(self, number):
-        return (self.mask & number) >> self.lowbit
+        """ evaluate number, in mask, relative to lowbit. Perform sign extension if a twos complement value"""
+        value = (self.mask & number) >> self.lowbit
+        if self.is_twos_complement:
+            value = sign_extend(value)
+        return value
 
     def compare(self, number):
         return self.evaluate(number) == self.value
@@ -88,6 +93,8 @@ class packet_part:
         names.append( "(lowbit, highbit) = {}".format( (self.lowbit, self.highbit) ) )
         if self.value is not None:
             names.append("value = {0:b} (base 2)".format(self.value))
+        if self.is_twos_complement:
+            names.append("field is a twos complement number")
         names.append("mask = {}".format(nibble_string(self.mask)))  
         return "\n".join(names)
 
