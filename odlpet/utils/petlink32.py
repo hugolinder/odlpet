@@ -76,10 +76,12 @@ class packet_part:
         self.name = name
         self.is_twos_complement = is_twos_complement
 
-    def evaluate(self, number):
-        """ evaluate number, in mask, relative to lowbit. Perform sign extension if a twos complement value"""
+    def evaluate(self, number, is_twos_complement =None):
+        """ evaluate number, in mask, relative to lowbit. Perform sign extension if a twos complement value (default to self) """
+        if is_twos_complement is None:
+            is_twos_complement = self.is_twos_complement
         value = (self.mask & number) >> self.lowbit
-        if self.is_twos_complement:
+        if is_twos_complement:
             value = sign_extend(value)
         return value
 
