@@ -1,27 +1,72 @@
 class packet:
-    def __init__(self, id_part, value_parts, name="packet part"):
-        self.id_part = id_part
-        self.value_parts = values
-        self.name = name
+    # petlink_doc_string (for construction) 
+    # packet parts, fixed or variable
+    #       id, values
+    # name
+    # field names
+    # twos_complement (for evaluation) 
+    # 
+
+    def __init__(self, PETLink_doc_str, packet_name = None, part_names = None, twos_complement = None):
+        self.PETLink_doc_str = PETLink_doc_str
+        self.part_names = part_names
+        self.twos_complement = twos_complement
+        self.name = packet_name
+        #parse doc string, create parts
+        instruction = PETLink_doc_str.replace(" ", "")
+        self.len = len(instruction)
+        if self.len != 32:
+            print("warning, instruction length does not indicate 32 bit packet")
+            print("instruction {}, of length {}".format(instruction, self.len))
+        # first, split instruction into parts
+        instruction_parts = []
+        part_string = ""
+        part_char = instruction[0]
+        for char in instruction:
+            if not (char == part_char): # that is, not AA, 00, 11, ...
+                pair = char + part_char
+                if not ((pair == "01") or (pair == "10")):
+                    instruction_parts.append(part_string)
+                    part_string = ""
+                    part_char = char
+            part_string = part_string + char
+        instruction_parts.append(part_string)
+        # secondly, create a packet part for each instruction part
+        self.parts = []
+        offset = 0
+        for part in instruction_parts:
+            nbits = len(part)
+            offset = offset + nbits
+            lowbit = self.len - offset
+            highbit = lowbit + (nbits-1)
+            part_char = part[0]
+            is_value = (part_char == '1' ) | (part_char == '0' )
+            value = int(part, base=2) if is_value else None
+            self.parts.append(packet_part(lowbit, highbit, value))
+        # finally, naming
+        if self.part_names is not None:
+            for part, name in zip(self.parts, self.part_names):
+                part.name = name
 
     def __repr__(self):
-        names = [self.name]
-        names.append(id_part)
-        for k, part in self.value_parts:
-            names.append(part)
-        return "\n".join(names)
-
+        parts_info = [part.__repr__() for part in self.parts]
+        parts_info = "\n---\n".join(parts_info)
+        return "packet(name = {}\nPETLink_doc_str = {}\nparts = \n{})".format(self.name, self.PETLink_doc_str, parts_info)
+        
     def compare(self, number):
-        return self.id_part.compare(number)
+        """ compares with all value parts, returns True when all value parts compare True. """
+        result = True
+        for part in self.parts:
+            if part.value is not None:
+                result = part.compare(number) == result
+        return result
 
     def evaluate(self, number):
-        values = []
-        for part in value_parts:
-            values.append(part.evaluate(number))
-        return values
+        """ return sequence of number evalations, one per part in the packet. """
+        return [part.evaluate(number) for part in self.parts]
 
 class packet_part:
-    def __init__(self, lowbit, highbit=None, value=None, name="packet part"):
+    def __init__(self, lowbit, highbit=None, value=None, name=None):
         self.lowbit = lowbit
         if highbit is None:
             highbit = lowbit
@@ -37,9 +82,10 @@ class packet_part:
         return self.evaluate(number) == self.value
 
     def __repr__(self):
-        names = [self.name]
-        names.append("low bit = {}".format(self.lowbit))
-        names.append("high bit = {}".format(self.highbit))
+        names = []
+        if self.name is not None:
+            names.append(self.name)
+        names.append( "(lowbit, highbit) = {}".format( (self.lowbit, self.highbit) ) )
         if self.value is not None:
             names.append("value = {0:b} (base 2)".format(self.value))
         names.append("mask = {}".format(nibble_string(self.mask)))  
@@ -67,7 +113,6 @@ def sign_extend(number, nbits):
     """ convert a 2's complement natural number to the corresponding integer """
     signbit = (number >> (nbits-1)) & 1
     return signbit*(number - (1 << nbits)) + (signbit == 0)*number
-
 
 #   PETLink documentation, start at page 4
 #   3.1 Overview, page 4
