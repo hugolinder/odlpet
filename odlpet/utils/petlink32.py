@@ -1,3 +1,12 @@
+class document_section:
+    def __init__(self, name, packets):
+        self.packets = packets
+        self.name = name
+
+    def __repr__(self):
+        names = [self.name]
+        return "section(name = {}\n, packets = \n{}\n)".format(self.name, "\n".join([packet.name for packet in self.packets]))
+
 class packet:
     def __init__(self, instruction, packet_name = None, part_names = None, is_twos_complement = None):
         instruction_lines = instruction.split("\n")
@@ -9,39 +18,14 @@ class packet:
         self.part_names = part_names
         self.is_twos_complement = is_twos_complement
         self.name = packet_name
-        #parse doc string, create parts
-        instruction = instruction.replace(" ", "")
+        instruction = instruction.replace(" ", "") 
         self.len = len(instruction)
         if self.len != 32:
             print("warning, instruction length does not indicate 32 bit packet")
             print("instruction {}, of length {}".format(instruction, self.len))
-        # first, split instruction into parts
-        instruction_parts = []
-        part_string = ""
-        part_char = instruction[0]
-        for char in instruction:
-            if not (char == part_char): # that is, not AA, 00, 11, ...
-                pair = char + part_char
-                if not ((pair == "01") or (pair == "10")):
-                    instruction_parts.append(part_string)
-                    part_string = ""
-                    part_char = char
-            part_string = part_string + char
-        instruction_parts.append(part_string)
-        # secondly, create a packet part for each instruction part
-        self.parts = []
-        offset = 0
-        for part in instruction_parts:
-            nbits = len(part)
-            offset = offset + nbits
-            lowbit = self.len - offset
-            highbit = lowbit + (nbits-1)
-            part_char = part[0]
-            is_value = (part_char == '1' ) | (part_char == '0' )
-            value = int(part, base=2) if is_value else None
-            self.parts.append(packet_part(lowbit, highbit, value))
+        self.parts = parse_instruction(instruction) 
         # finally, naming and twos_complement
-        if self.part_names is not None:
+        if self.part_names is not None: 
             for part, name in zip(self.parts, self.part_names):
                 part.name = name
         if self.is_twos_complement is not None:
@@ -51,7 +35,7 @@ class packet:
     def __repr__(self):
         parts_info = [part.__repr__() for part in self.parts]
         parts_info = "\n---\n".join(parts_info)
-        return "packet(name = {}\ninstruction = {}\nparts = \n{})".format(self.name, self.instruction, parts_info)
+        return "packet(name = {}\ninstruction = {}\nparts = \n{}\n)".format(self.name, self.instruction, parts_info)
         
     def compare(self, number):
         """ compares with all value parts, returns True when all value parts compare True. """
@@ -100,6 +84,34 @@ class packet_part:
             names.append("field is a twos complement number")
         names.append("mask = {}".format(nibble_string(self.mask)))  
         return "\n".join(names)
+
+def parse_instruction(instruction):
+    """ parse doc string, create parts"""
+    instruction = instruction.replace(" ", "")
+    instruction_parts = [] # first, split instruction into parts
+    part_string = ""
+    part_char = instruction[0]
+    for char in instruction:
+        if not (char == part_char): # that is, not AA, 00, 11, ...
+            pair = char + part_char
+            if not ((pair == "01") or (pair == "10")):
+                instruction_parts.append(part_string)
+                part_string = ""
+                part_char = char
+        part_string = part_string + char
+    instruction_parts.append(part_string)
+    parts = [] # secondly, create a packet part for each instruction part
+    offset = 0
+    for part in instruction_parts:
+        nbits = len(part)
+        offset = offset + nbits
+        lowbit = len(instruction) - offset
+        highbit = lowbit + (nbits-1)
+        part_char = part[0]
+        is_value = (part_char == '1' ) | (part_char == '0' )
+        value = int(part, base=2) if is_value else None
+        parts.append(packet_part(lowbit, highbit, value))
+    return parts
 
 def get_mask(lowbit, highbit):
     """ 1s from lowbit (LSB) to highbit (MSB), 0 elsewhere. Example, get_mask(1,2) --> 110 (binary)  """
