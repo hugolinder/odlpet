@@ -26,6 +26,7 @@ def compression_from_hdr(scanner, hdr_path, compression_obj = None, verbose = Fa
     compression =None: a odlpet compression to update
     verbose = False: if verbose: print step commit descriptions
     """
+    if verbose: print("verbose description of steps enabled with verbose = {}".format(verbose))
     if verbose: print("parse header file at path")
     hdr = interfile.load(hdr_path)
     if verbose: print("determine if listmode or sinogram")
@@ -124,4 +125,5 @@ def compression_from_hdr(scanner, hdr_path, compression_obj = None, verbose = Fa
     if verbose: 
         pairs = [(name, getattr(compression_obj, name)) for name in attribute_names]
         print("show target updated attributes (name, value) \n = {}".format(pairs))
+    if verbose: print("return")
     return compression_obj
