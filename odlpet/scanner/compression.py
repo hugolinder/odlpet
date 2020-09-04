@@ -172,7 +172,11 @@ class Compression:
         return self.scanner.num_rings - 1
 
     def get_stir_proj_data_info(self):
-        _stir_scanner = self.scanner.get_stir_scanner()
+        if self.stir_scanner is None: #Hugo fix
+            _stir_scanner = self.scanner.get_stir_scanner()
+        else:
+            _stir_scanner = self.stir_scanner
+        
         proj_data_info = ProjDataInfo.ProjDataInfoCTI(
             _stir_scanner,
             self.span_num,
