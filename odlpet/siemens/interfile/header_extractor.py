@@ -28,7 +28,7 @@ def extract_family(hdr, name):
     return [hdr[key]['value'] for key in matched_keys]
 
     
-def compression_from_hdr(scanner, hdr_path, compression_obj = None, verbose = False):
+def compression_from_hdr(hdr_path, scanner=None, compression_obj = None, verbose = False):
     """
     input: 
     scanner: an odlpet scanner object
@@ -40,35 +40,27 @@ def compression_from_hdr(scanner, hdr_path, compression_obj = None, verbose = Fa
     if verbose: print("parse header file at path")
     hdr = header_parser.load(hdr_path)
     
-    if verbose: print("determine if listmode or sinogram")
-    key = "SMS-MI header name space"
-    value = hdr[key]['value']
-    is_sinogram = value == "sinogram subheader"
-    if verbose:
-        dtype = "sinogram" if is_sinogram else "listmode"
-        print("assume data is {}, based on {}:={}".format(dtype, key, value))
+    # check if listmode 
+    is_listmode = extract_listmode_info(hdr)[0]
 
-    # sanity check
-    hdr_end = ".s.hdr"
-    is_sinogram2 = hdr_path.endswith(hdr_end) 
-    if verbose: print("check 'header path {} ends with {}' = {}".format(hdr_path, hdr_end, is_sinogram2))
-    if is_sinogram != is_sinogram2:
-        print("error, unexpected header content and file extension (e.g. '.s.hdr') mismatch, will exit")
-        exit()
-            
-    if compression_obj is None: 
-        if verbose: print("create scanner default compression")
+    if compression_obj is None:
+        if scanner is None:
+            raise Exception("header_extractor: cannot create compression object without either scanner or compression object")
+        if verbose: print("creating scanner default compression object")
         compression_obj = Compression(scanner)
-        
-    if verbose: print("create list of target odlpet compression attributes to update")
-    attribute_names = ["span_num", "max_num_segments", "num_of_views", "num_non_arccor_bins", "data_arc_corrected"]
-    hdr_names = ["axial compression", "maximum ring difference", "number of views", "number of projections", "applied corrections"]
+    
+    span_num = extract_span_num(hdr)
+    num_segments = np.ceil(extract_num_segments(hdr) / 2)
+    max_diff_ring = extract_max_diff_ring
+    
+    attribute_names = ["span_num", "max_num_segments", "max_diff_ring", "num_of_views", "num_non_arccor_bins", "data_arc_corrected"]
+    hdr_names = ["axial compression", "number of segments", "maximum ring difference", "number of views", "number of projections", "applied corrections"]
     
     if verbose: print("compression attributes {} \n, corresponds to {}\n, in header".format(attribute_names, hdr_names))
     hdr_matrix_names = ["sinogram views", "sinogram projections"]
     n_easy = 2 
     n_matrix = 2
-    if not is_sinogram: 
+    if is_listmode: 
         n_easy = n_easy + n_matrix
         n_matrix = 0
     easy_attributes = attribute_names[:n_easy]
@@ -94,7 +86,7 @@ def compression_from_hdr(scanner, hdr_path, compression_obj = None, verbose = Fa
         update_attr(name, value)
     
     # matrices 
-    if is_sinogram:
+    if not is_listmode:
         if verbose: print("extract lists for matrix")
         hdr_families = ["matrix axis label", "matrix size"]
         matrix_info = [extract_family(hdr, family) for family in hdr_families]
@@ -151,8 +143,122 @@ def compression_from_hdr(scanner, hdr_path, compression_obj = None, verbose = Fa
     
     return compression_obj
 
+def extract_max_diff_ring(hdr):
+    """
+    input: 
+    hdr: the header dictionary extracted from the interfile header file
+    output:
+    max_diff_ring: the maximum ring difference
+    """
+    
+    max_diff_ring = 0
+    
+    if keys.MAX_RING_DIFF in hdr:
+        max_diff_ring = hdr[keys.MAX_RING_DIFF]['value']
+    
+    return max_diff_ring
+    
+def extract_max_ring_diff(hdr):
+    """
+    input: 
+    hdr: the header dictionary extracted from the interfile header file
+    output:
+    max_ring_diff: the maximum ring difference
+    """
+    
+    max_ring_diff = 0
+    
+    if keys.MAX_RING_DIFF in hdr:
+        max_ring_diff = hdr[keys.MAX_RING_DIFF]['value']
+    
+    return max_ring_diff
 
+def extract_span_num(hdr):
+    """
+    input: 
+    hdr: the header dictionary extracted from the interfile header file
+    output:
+    span_num: the span number
+    """
+    
+    span_num = 0
+    
+    if keys.SPAN_NUM in hdr:
+        span_num = hdr[keys.SPAN_NUM]['value']
+    
+    return span_num
 
+def extract_num_rings(hdr):
+    """
+    input: 
+    hdr: the header dictionary extracted from the interfile header file
+    output:
+    num_rings: the number of rings in scanner
+    """
+    
+    num_rings = 0
+    
+    if keys.NUM_RINGS in hdr:
+        num_rings = hdr[keys.NUM_RINGS]['value']
+    
+    return num_rings
+    
+    
+def extract_num_non_arccor_bins(hdr):
+    """
+    input: 
+    hdr: the header dictionary extracted from the interfile header file
+    output:
+    num_non_arccor_bins: the maximum ring difference
+    """
+    
+    #STIR: 'applied corrections' keyword not found. Assuming non-arc-corrected data
+    
+    num_non_arccor_bins = 0
+    
+    if keys.MAX_RING_DIFF in hdr:
+        num_non_arccor_bins = hdr[keys.MAX_RING_DIFF]['value']
+    
+    return num_non_arccor_bins
+
+    
+    
+def extract_arc_correction(hdr):
+    
+    name = "data_arc_corrected"
+    hdr_name = "applied corrections"
+    hdr_value = "radial arc-correction"
+        
+    if verbose: 
+        hdr_name2 = "'is {} one of the {}'".format(hdr_value, hdr_name)
+        print("interpret attribute {} as {}".format(name, hdr_name2))
+    
+    value = False # Siemens apparent default: unless stated, not corrected for
+    hdr_line = hdr.get(hdr_name)
+    if hdr_line is None:
+        if verbose: print("no corrections")
+    else:
+        corrections = hdr_line['value'] # a sequence of applied corrections
+        if verbose: print("{}:= {}".format(hdr_name, corrections))
+        value = corrections.count(hdr_value) > 0
+        update_attr(name, value)	 
+    return data_arc_corrected
+    
+def extract_num_segments(hdr):
+    """
+    input: 
+    hdr: the header dictionary extracted from the interfile header file
+    output:
+    num_segments: number of segments
+    """
+    
+    num_segments = 0
+    
+    if keys.NUM_SEGMENTS in hdr:
+        num_segments = hdr[keys.NUM_SEGMENTS]['value']
+    
+    return num_segments
+    
 def extract_TOF_info(hdr):
     """
     input: 
@@ -187,7 +293,7 @@ def extract_segment_table(hdr):
     
     return segment_table  
     
-def extract_histogram(hdr):
+def extract_histogram_shape(hdr):
     """
     input: 
     hdr: the header dictionary extracted from the interfile header file
@@ -208,11 +314,14 @@ def extract_histogram(hdr):
     TOF_bins, TOF_mash_factor = extract_TOF_info(hdr)
     listmode = extract_listmode_info(hdr)
 
-    if (TOF_bins > 0):
-        sizes.append(TOF_bins + 1) #+1 is for randoms (delayed)
-        labels.append("time of flight bins")
+    # for mCT listmode the order is tof_bin, num_sinograms, num_views, num_projections
+    # not sure if mCT sinogram has the same order?
+    # for mMR data the number of tof bins = 1 but time of flight is not included => assuming not TOF bin should be used
                 
     if (listmode):
+        if (TOF_bins > 1):
+            sizes.append(TOF_bins + 1) #+1 is for randoms (delayed)
+            labels.append("time of flight bins")
         if keys.SEG_TABLE in hdr:
             # in listmode the number of sinograms is not given but can be calculated as the sum of sinograms per each segment
             nr_of_sinograms = np.sum(hdr[keys.SEG_TABLE]['value'])
@@ -225,6 +334,9 @@ def extract_histogram(hdr):
             sizes.append(hdr[keys.LM_NUM_PROJ]['value'])
             labels.append("sinogram projections")
     else:
+        if (TOF_bins > 1):
+            sizes.append(TOF_bins + 1) #+1 is for randoms (delayed)
+            labels.append("time of flight bins")
         if keys.HISTO_NUM_SINO in hdr:
             sizes.append(keys.HISTO_NUM_SINO)
             labels.append("number of sinograms")
@@ -252,8 +364,7 @@ def extract_listmode_info(hdr):
     if keys.LM_WORD_CNT in hdr:
         is_listmode = True
         listmode_wordcnt = hdr[keys.LM_WORD_CNT]['value']
-    
-    
+        
     return is_listmode, listmode_wordcnt  
 
 

@@ -9,6 +9,7 @@ class InterfileKeys():
     
     # segment table, gives number of sinograms per segment
     SEG_TABLE = "segment table"
+    NUM_SEGMENTS = "number of segments"
     
     # Time of flight 
     TOF_NUM_BINS = "number of TOF time bins"
@@ -24,3 +25,6 @@ class InterfileKeys():
     HISTO_NUM_PROJ  = "sinogram projections"
     HISTO_NUM_VIEWS = "sinogram views"
 
+    SPAN_NUM      = "axial compression"
+    NUM_RINGS     = "number of rings"
+    MAX_RING_DIFF = "maximum ring difference"

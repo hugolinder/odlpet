@@ -3,10 +3,24 @@ import odlpet.siemens.listmode.petlink.format32 as petlink32
 import numpy as np
 import os
 
+class DataStruct():
+    def __init__(self, params, verbose=False):
+        
+        if not params or params == None:
+            raise Exception("listmode init DataStruct requires input params")
+        
+        if not params.filename:
+            raise Exception("listmode.DataStruct(): filename is missing in listmode params, cannot create DataStruct")
+        
+        self.params = params
+        
+        self.packets = get_packets_from_data_file(params.filename, verbose) 
+        
+       
 def is_uint32(n):
     return isinstance(n, np.uint32)
 
-def get_packets_from_data_file(filename, dtype=np.uint32):
+def get_packets_from_data_file(filename, verbose=False, dtype=np.uint32):
     """
     input: 
     filename: data filename with path, will be checked for correct file extension
@@ -21,7 +35,9 @@ def get_packets_from_data_file(filename, dtype=np.uint32):
                 
     with open(filename, 'rb') as file:
         listmode_packets = np.fromfile(file, dtype = dtype)
-        
+    if verbose:
+        print("listmode_packets =", listmode_packets, " length = ", len(listmode_packets))
+       
     return listmode_packets
 #----------------------------------------------------    
 def get_events_from_packets(listmode_packets, verbose=False):
@@ -41,6 +57,45 @@ def get_events_from_packets(listmode_packets, verbose=False):
         print("listmode_events =", listmode_events, " length = ", len(listmode_events))
                 
     return listmode_events
+#----------------------------------------------------        
+def get_prompts_from_packets(listmode_packets, verbose=False):
+    """
+    input: 
+    listmode_packets: array of listmode packets 
+    verbose: information printed to screen if True
+    output:   
+    listmode_prompts: array of listmode prompts
+    """
+    
+    # get prompts    
+    listmode_events = get_events_from_packets(listmode_packets, False)
+    is_prompt = petlink32.PROMPT.compare(listmode_events)
+    listmode_prompts = listmode_events[is_prompt]
+            
+    if verbose:
+        print("listmode_prompts =", listmode_prompts, " length = ", len(listmode_prompts))
+                
+    return listmode_prompts    
+#----------------------------------------------------        
+def get_delayeds_from_packets(listmode_packets, verbose=False):
+    """
+    input: 
+    listmode_packets: array of listmode packets 
+    verbose: information printed to screen if True
+    output:   
+    listmode_delayeds: array of listmode delayed events (in the last TOF bin)
+    """
+    
+    # get delayed    
+    listmode_events = get_events_from_packets(listmode_packets, False)
+    is_prompt = petlink32.PROMPT.compare(listmode_events)
+    is_delayed = np.invert(is_prompt)
+    listmode_delayeds = listmode_events[is_delayed]
+            
+    if verbose:
+        print("listmode_delayeds =", listmode_delayeds, " length = ", len(listmode_delayeds))
+                
+    return listmode_delayeds    
 #----------------------------------------------------    
 def get_bin_addresses_from_packets(listmode_packets, verbose=False):
     """
