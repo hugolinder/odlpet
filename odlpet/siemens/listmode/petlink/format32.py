@@ -1,3 +1,5 @@
+# parts and logic for 32 bit packets 
+
 class document_section:
     def __init__(self, name, packets, pages = None):
         self.packets = packets

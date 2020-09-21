@@ -1,4 +1,9 @@
-# -*- coding: utf-8 -*-
+# collected experience from 
+# header files 
+# , STIR 
+# and Stefano Pedemonte's Interfile
+
+# -*- coding: utf-8 -*- 
 
 # interfile - Interfile read and write 
 # Stefano Pedemonte

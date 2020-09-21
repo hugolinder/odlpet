@@ -6,15 +6,32 @@ class Scanner:
     # some reasonable default values
     num_rings = 1
     intrinsic_tilt = 0.
+    
     num_detector_layers = 1
-    trans_blocks_per_bucket = 0
+    
     axials_blocks_per_bucket = 0
-    trans_crystals_per_block = 0
     axial_crystals_per_block = 0
-    trans_crystals_per_singles_unit = -1
     axial_crystals_per_singles_unit = -1
+    
+    num_axial_blocks = 0
+    num_axial_buckets = 0
+    num_axial_blocks_per_bucket = 0
+    
+    trans_blocks_per_bucket = 0
+    trans_crystals_per_block = 0
+    trans_crystals_per_singles_unit = -1
+    
+    num_transaxial_blocks = 0
+    num_transaxial_buckets = 0
+    num_transaxial_blocks_per_bucket = 0
+    
     average_depth_of_inter = 0
-
+    
+    num_virtual_axial_crystals_per_block = 0
+    num_virtual_transaxial_crystals_per_block = 0
+    
+    max_num_views = 0
+    
     max_num_non_arc_cor_bins = None
     default_non_arc_cor_bins = None
 
@@ -23,6 +40,7 @@ class Scanner:
     det_radius = 102
     ring_spacing = 1.35
     voxel_size_xy = 0.3
+    
 
     def get_stir_scanner(self):
         """
@@ -42,7 +60,7 @@ class Scanner:
 
         for (sa, pa, ty) in ACCESSOR_MAPPING:
             getattr(scanner, "set_"+sa)(ty(getattr(self, pa)))
-
+                    
         if _check_consistency(scanner):
             return scanner
         else:
@@ -87,48 +105,68 @@ def _get_scanner_names():
 SCANNER_NAMES = _get_scanner_names()
 
 # a mapping between STIR and Python accessors, as well as the corresponding type
+# re-organized in alphabetical order
 ACCESSOR_MAPPING = [
-    ("num_rings", "num_rings", np.int32),
-    ("num_detectors_per_ring", "num_dets_per_ring", np.int32),
-    ("default_bin_size", "voxel_size_xy", np.float32),
-    ("default_num_arccorrected_bins", "default_non_arc_cor_bins", np.int32),
-    ("default_intrinsic_tilt", "intrinsic_tilt", np.float32),
-    ("inner_ring_radius", "det_radius", np.float32),
-    ("ring_spacing", "ring_spacing", np.float32),
     ("average_depth_of_interaction", "average_depth_of_inter", np.float32),
+    ("default_bin_size", "voxel_size_xy", np.float32),
+    ("default_intrinsic_tilt", "intrinsic_tilt", np.float32),
+    ("default_num_arccorrected_bins", "default_non_arc_cor_bins", np.int32),
+    #("energy_resolution", "energy_resolution", np.float32),
+    ("inner_ring_radius", "det_radius", np.float32),
     ("max_num_non_arccorrected_bins", "max_num_non_arc_cor_bins", np.int32),
-    ("num_axial_blocks_per_bucket", "axials_blocks_per_bucket", np.int32),
-    ("num_transaxial_blocks_per_bucket", "trans_blocks_per_bucket", np.int32),
     ("num_axial_crystals_per_block", "axial_crystals_per_block", np.int32),
-    ("num_transaxial_crystals_per_block", "trans_crystals_per_block", np.int32),
+    ("num_axial_blocks_per_bucket", "axials_blocks_per_bucket", np.int32),
     ("num_axial_crystals_per_singles_unit", "axial_crystals_per_singles_unit", np.int32),
-    ("num_transaxial_crystals_per_singles_unit", "trans_crystals_per_singles_unit", np.int32),
     ("num_detector_layers", "num_detector_layers", np.int32),
+    ("num_detectors_per_ring", "num_dets_per_ring", np.int32),
+    ("num_rings", "num_rings", np.int32),
+    ("num_transaxial_crystals_per_block", "trans_crystals_per_block", np.int32),
+    ("num_transaxial_blocks_per_bucket", "trans_blocks_per_bucket", np.int32),
+    ("num_transaxial_crystals_per_singles_unit", "trans_crystals_per_singles_unit", np.int32),
+    ("ring_spacing", "ring_spacing", np.float32)
 ]
 
 class mCT(Scanner):
     # Detector x size in mm - plus the ring difference
-    det_nx_mm = 6.25
+    det_nx_mm = 4.054
     # Detector y size in mm - plus the ring difference
-    det_ny_mm = 6.25
+    det_ny_mm = 4.054
     # Total number of rings
-    num_rings = 8
+    num_rings = 55
     # Total number of detectors per ring
-    num_dets_per_ring = 112
+    num_dets_per_ring = 672
     # Inner radius of the scanner (crystal surface)
-    det_radius = 57.5 # in mm
+    det_radius = 421.0 # in mm
 
     #
     # Additional things that STIR would like to know
     #
     average_depth_of_inter = 7.0 # in mm
     ring_spacing = det_ny_mm
-    voxel_size_xy = 1.65 # in mm
-    axial_crystals_per_block = 8
-    trans_crystals_per_block = 7
-    axials_blocks_per_bucket = 1
-    trans_blocks_per_bucket = 16
-    axial_crystals_per_singles_unit = 8
+    voxel_size_xy = 2.005 # in mm
+    
+    axial_crystals_per_block = 14
+    trans_crystals_per_block = 14
+
+    axials_blocks_per_bucket = 4
+    trans_blocks_per_bucket = 1
+
+    axial_crystals_per_singles_unit = 0
     trans_crystals_per_singles_unit = 0
+
     num_detector_layers = 1
     intrinsic_tilt = 0.0
+
+    default_non_arc_cor_bins = 400
+    max_num_non_arc_cor_bins = 400
+    
+    num_detector_layers = 1
+    num_axial_blocks = 4
+    num_axial_buckets = 1
+    num_axial_blocks_per_bucket = 4
+    num_transaxial_blocks = 48
+    num_transaxial_buckets = 48
+    num_transaxial_blocks_per_bucket = 1
+    num_virtual_axial_crystals_per_block = 1
+    num_virtual_transaxial_crystals_per_block = 1
+    max_num_views = 336

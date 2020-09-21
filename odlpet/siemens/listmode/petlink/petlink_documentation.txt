@@ -1,0 +1,145 @@
+# this is an excerpt from the Siemens PETLink documentation.
+# It describes a listmode format, in lists where the entries/elements/packets are either 32 or 64 bits.
+# Only the parts of the text directly related to packets have been preserved: definition and meaning of packets as well as the sections structuring them.
+# note that the descriptions of the packet parts for a given packet comes in no particular order, see for example the SPECT Event packet
+
+# Guideline to the PETLINKTM Proposal 21-Jun-2018 Rev J2
+# 32-bit packet format
+pagenumber 4
+
+section Overview
+
+packet foundation
+TXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX 
+T = Tag Bit (1-Tag/0-Event)
+X = Not Restricted
+
+packet Event packet (Not a tag packet)
+0XXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+
+packet TAG 1: Time Marker/ Dead-Time Tracking
+10XX XXXX XXXX XXXX XXXX XXXX XXXX XXXX  
+
+packet TAG 2: Gantry Motions & Positions 
+110X XXXX XXXX XXXX XXXX XXXX XXXX XXXX 
+
+packet TAG 3: Patient Monitoring: (Gating/Physiological /Head Tracking) 
+1110 XXXX XXXX XXXX XXXX XXXX XXXX XXXX 
+
+packet TAG 4: Control / Acquisition Parameters 
+1111 XXXX XXXX XXXX XXXX XXXX XXXX XXXX 
+
+section Event Packet: (Most Significant Nibble = 0uuu) 
+packet  PET Bin-Address Event Packet 
+0PBB BBBB BBBB BBBB BBBB BBBB BBBB BBBB
+P: Prompt (1 - Prompt; 0 - Delay) 
+B: Bin Address: 0-29. Note that older PET systems (< 1998?) designated bit 29 (i.e. B29) as a Transmission/Window (W) bit.
+packet SPECT Event Packet (Obsolete) 
+0uuu uuuH XXXX XXXh SYYY YYYY EEEE EEEE
+u: Undefined (Default: Set to zero.) 
+S: Shape bit (Decay: Fast =1 / Slow = 0) 
+H: Head Index (A=0;B=1) 
+Y: Axial Xtal Index: 0-6 
+X: Transaxial Xtal Index: 0-6 
+E: Energy Index: 0-7 
+h: Hit bit (always = 1) 
+
+pagenumber 5
+
+packet Position Profile Data (Maintenance) 
+0uuu uHHH BBBB BBBh XXXX XXXX YYYY YYYY
+u: Undefined (Default: Set to zero.) 
+H: Head number: 0-2 [See 3 H-field bits labelled by “210” above.] 
+B: Block position: 0-6 h: Hit bit (always = 1) 
+X: X position data: 0-7 
+Y: Y position data: 0-7
+
+packet Energy Discrimination Data (Maintenance) 
+0uuu uHHH BBBB BBBh FFFF FFFF SSSS SSSS
+u: Undefined (Default: Set to zero.) 
+H: Head number: 0-2 [See 3 H-field bits labelled by “210” above.] 
+B: Block position: 0-6 
+h: Hit bit (always = 1) 
+F: First energy ADC sample: 0-7 
+S: Second energy ADC sample: 0-7 
+
+packet Crystal Energy Data (Maintenance) 
+0uuu uHHH BBBB BBBh EEEE EEEE YYYY XXXX 
+u: Undefined (Default: Set to zero.) 
+H: Head number: 0-2 [See 3 H-field bits labelled by “210” above.] 
+B: Block position: 0-6 
+h: Hit bit (always = 1) 
+E: Second ADC sample: 0-7 
+Y: Y position in block: 0-3 [See 4 Y-field bits labelled by “3210” above.] 
+X: X position in block: 0-3 [See 4 X-field bits labelled by “3210” above.] 
+
+packet Crystal Time Data (Maintenance) 
+0uuu uHHH BBBB BBBh 0TTT TTTT YYYY XXXX  
+u: Undefined (Default: Set to zero.) 
+H: Head number: 0-2 [See 3 H-field bits labelled by “210” above.] 
+B: Block position: 0-6 h: Hit bit (always = 1) 
+T: TDC value: 0-6 
+Y: Y position in block: 0-3 [See 4 Y-field bits labelled by “3210” above.] 
+X: X position in block: 0-3 [See 4 X-field bits labelled by “3210” above.] 
+
+pagenumber 6
+
+section TAG 1: Elapsed Time Marker/Dead-Time Tracking (Most Significant Nibble = 10uu) 
+packet Elapsed Time Marker 
+100M MMMM MMMM MMMM MMMM MMMM MMMM MMMM 
+M: Elapsed milliseconds: 0-28 
+
+packet Dead-Time Tracking (Legacy Block Singles) 
+101B BBBB BBBB BSSS SSSS SSSS SSSS SSSS
+B: Block Number : 0-9 
+S: Singles per second (per 0.25 sec. May-02; per 0.125 sec. Aug-07): 0-18 
+Note: Originally this 19-bit S field was defined to represent singles per second. 
+As of May 2002, a change was implemented by Siemens/CTI 
+to down shift by 2 bits the singles/sec value prior to loading into this field 
+– making the S value represent Singles/quarter-second. 
+To get a value in Singles/sec, simply up shift the S value by 2 bits – i.e. multiply by 4. 
+This down shift was done in order to extend the top-end range supported by this 19 bit field. 
+In other words, later versions of the blocks began to effectively detect more than 500k Singles/sec. 
+This 2-bit-down shift allowed support for singles/sec rates for each block as high as 2.1 M/sec 
+and with a negligible loss in precision. As of August 2007 and along similar lines, 
+another change was implemented by Siemens for some later version systems to instead down shift by 3 bits. 
+So for those later version systems to get a Singles/sec value from the S field, multiply S by 8.
+
+pagenumber 7
+
+section Expanded Format: Dead-Time Tracking 
+
+packet foundation
+
+101T TTDD DDDD DDDD DDDD DDDD DDDD DDDD
+D: Data Field: 0-25 
+T: Type field: 0-2 [See 3 T-field bits labelled by “2 10” above.] 
+T field value (0 – 7; one of eight) indicates type of D field content. Guidelines: 
+T = 0 indicates Block Singles content. 
+T = 1 – 5 reserved. 
+T= 6 indicates Lost (Prompt or Delayed) Event Count Packets inserted by the “Second Lossy Node” - e.g. the PDR card or the PSB card. [Type 6 not needed after 2017 with move to 10GbE.] T = 7 indicates Lost (Prompt or Delayed) Event Count Packets inserted by the “First Lossy Node” - e.g. the Coincidence Processor or GIM. 
+
+packet Block Singles Type (T = 0)
+1010 00BB BBBB BSSS SSSS SSSS SSSS SSSS
+S: Singles per second (per 0.25 sec. May-02; per 0.125 sec. Aug-07): 0-18 
+B: Block Number: 0-6 
+Note that this Block Number field is reduced to 7 bits compared to the original 10-bit Block Number for the Legacy case above. 
+Since the range of block numbers reported was always small (< 128), this reduction to 7 bits should be backward compatible. 
+
+packet Lost Event Counter Type.
+101T TTrr rrrr LLLL LLLL LLLL LLLL LLLL 
+T: Type Field: 0-2. Values of 6 or 7 only. 
+r: reserved. 
+L: Lost Event Packets: 0-19. 
+The L value represents a count of event packets observed to be lost 
+during the processing of 1M (or precisely 1048575) arriving event packets. 
+In other words, 1M packets come in and only 1M – L packets are transmitted. 
+After each arriving 1M packets are processed, the loss count (L) is transmitted in this tag packet format. 
+If L is zero, this indicates there were no lost event packets for the 1M arriving event packets which were just processed.
+
+
+
+
+
+
+

@@ -10,7 +10,8 @@ from stir import (FloatCartesianCoordinate3D,
                   FloatVoxelsOnCartesianGrid,
                   ProjDataInMemory,
                   ExamInfo,
-                  ProjDataInfo)
+                  ProjDataInfo,
+                  Scanner_get_scanner_from_name)
 
 class Compression:
     def __init__(self, scanner=None):
@@ -48,7 +49,9 @@ class Compression:
         # The number of tangential positions refers to the last sinogram
         # coordinate which is going to be the LOS's distance from the center
         # of the FOV. Normally this would be the number of default_non_arc_bins
-        self.num_non_arccor_bins = self.scanner.num_dets_per_ring // 2
+        #self.num_non_arccor_bins = self.scanner.num_dets_per_ring // 2
+        # the above seems wrong, using default_non_arc_cor_bins should be more correct? //LD fix
+        self.num_non_arccor_bins = self.scanner.default_non_arc_cor_bins
 
         # A boolean if the data have been arccorrected during acquisition
         # or in preprocessing. Anyways, STIR will not do that for you, but needs
@@ -56,6 +59,8 @@ class Compression:
         self.data_arc_corrected = False
 
         self.max_diff_ring = self.get_default_max_diff_ring()
+        self.stir_scanner = None
+        
 
     @classmethod
     def from_stir_proj_data_info(cls, proj_data_info):
@@ -66,7 +71,20 @@ class Compression:
         """
         scanner = Scanner.from_stir_scanner(proj_data_info.get_scanner())
         return cls(scanner)
-
+        
+    @classmethod    
+    def from_stir_scanner_name(cls, scanner_name):
+        """
+        Convenience method to obtain a compression object from STIR via scanner name.
+        Note that the compression properties are still the default ones,
+        not the ones corresponding to the projection data info.
+        """
+        stir_scanner = Scanner_get_scanner_from_name(scanner_name) 
+        scanner = Scanner.from_stir_scanner(stir_scanner) 
+        _compression = cls(scanner)
+        _compression.stir_scanner = stir_scanner # Hugo fix
+        return _compression
+        
     def get_stir_proj_data(self, stir_proj_data_info=None, initialize_to_zero=True):
         if stir_proj_data_info is None:
             stir_proj_data_info = self.get_stir_proj_data_info()
@@ -172,7 +190,12 @@ class Compression:
         return self.scanner.num_rings - 1
 
     def get_stir_proj_data_info(self):
-        _stir_scanner = self.scanner.get_stir_scanner()
+    
+        if self.stir_scanner is None: #Hugo fix
+            self._stir_scanner = self.scanner.get_stir_scanner()
+        
+        _stir_scanner = self.stir_scanner
+        
         proj_data_info = ProjDataInfo.ProjDataInfoCTI(
             _stir_scanner,
             self.span_num,
