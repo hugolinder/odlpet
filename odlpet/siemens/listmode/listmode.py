@@ -58,24 +58,32 @@ def get_events_from_packets(listmode_packets, verbose=False):
                 
     return listmode_events
 #----------------------------------------------------        
-def get_prompts_from_packets(listmode_packets, verbose=False):
+def get_prompts_from_events(listmode_events, events_time=[], verbose=False):
     """
     input: 
-    listmode_packets: array of listmode packets 
+    listmode_events: array of listmode events
     verbose: information printed to screen if True
     output:   
     listmode_prompts: array of listmode prompts
     """
     
     # get prompts    
-    listmode_events = get_events_from_packets(listmode_packets, False)
     is_prompt = petlink32.PROMPT.compare(listmode_events)
     listmode_prompts = listmode_events[is_prompt]
-            
+    
     if verbose:
         print("listmode_prompts =", listmode_prompts, " length = ", len(listmode_prompts))
-                
-    return listmode_prompts    
+        
+    if events_time == []:
+        return listmode_prompts  
+    else:  
+        events_prompts_time = events_time[is_prompt]
+        
+    if verbose:
+        print("prompts_time =", events_prompts_time, " length = ", len(events_prompts_time))
+        
+    return listmode_prompts, events_prompts_time
+
 #----------------------------------------------------        
 def get_delayeds_from_packets(listmode_packets, verbose=False):
     """
@@ -88,8 +96,7 @@ def get_delayeds_from_packets(listmode_packets, verbose=False):
     
     # get delayed    
     listmode_events = get_events_from_packets(listmode_packets, False)
-    is_prompt = petlink32.PROMPT.compare(listmode_events)
-    is_delayed = np.invert(is_prompt)
+    is_delayed = petlink32.DELAYED.compare(listmode_events)
     listmode_delayeds = listmode_events[is_delayed]
             
     if verbose:
@@ -141,9 +148,23 @@ def is_event_prompt(listmode_event):
     if not is_event(listmode_event):
         raise TypeError("listmode.is_event_prompt called with non-event packet")
     
-    # get the corresponding bin adresses
+    # returr if prompt or not
     return petlink32.PROMPT.compare(listmode_event)
-
+#----------------------------------------------------    
+def is_event_delayed(listmode_event):
+    """
+    input: 
+    listmode_event: a listmode event
+    output:   
+    is_packet_delayed: True if event is a delayed event
+    """
+    
+    if not is_event(listmode_event):
+        raise TypeError("listmode.is_event_delayed called with non-event packet")
+    
+    # returr if delayed or not
+    return petlink32.DELAYED.compare(listmode_event)
+#----------------------------------------------------    
 def is_event(listmode_event):
     """
     input: 
@@ -152,7 +173,7 @@ def is_event(listmode_event):
     is_event: True if packet is an event 
     """
     # todo: move checks like this to petlink
-    if is_uint32:
+    if is_uint32(listmode_event):
         # get the corresponding bin adresses
         return petlink32.EVENT.compare(listmode_event)
     else:
@@ -187,7 +208,7 @@ def get_timeslices_from_packets(listmode_packets, time_low=None, time_high=None,
     return time_at_markers, listmode_timeslices
 
 #----------------------------------------------------    
-def create_events_time_array_from_packets(listmode_packets, verbose=False):
+def create_events_time_arrays_from_packets(listmode_packets, time_range=None, verbose=False):
     """
     input: 
     listmode_packets:   array of listmode packets
@@ -199,74 +220,48 @@ def create_events_time_array_from_packets(listmode_packets, verbose=False):
     # get the time markers for all packets
     is_elapsed_time_markers = petlink32.ELAPSED_TIME_MARKER.compare(listmode_packets) # interpret content 
     
+    
     # create time array for all packets
     packets_time = np.cumsum(is_elapsed_time_markers) # how many ms have passed, per packet
-    
     # find events
     is_events = petlink32.EVENT.compare(listmode_packets)
-    events_time = packets_time[is_events]
+    events_all = listmode_packets[is_events]
+    # get the corresponding time array 
+    events_time_all = packets_time[is_events]
     
-    if verbose:
-        print("events time =", events_time, " length = ", len(events_time))
-        
-    return events_time
+    if time_range != None:
+        # select the events in time_range
+        try:
+            _indices = np.array([], dtype=np.uint32)
+            for _t in time_range:
+                _indices = np.append(_indices, np.where(events_time_all==_t))
 
-#----------------------------------------------------        
-def create_time_to_ba_dictionary(listmode_packets, time_low=None, time_high=None, verbose=False):
-    """
-    input: 
-    listmode_packets:   array of listmode packets 
-    time_low:           lower limit for time marker selection
-    time_high:          upper limit for time marker selection
-    verbose:            information printed to screen if True
-    output:   
-    time_dict: dictionary of time markers [ms], with an array of bin addresses for each time marker
-    """
-    
-    # get time markers and time slices
-    time_at_markers, listmode_timeslices = get_timeslices_from_packets(listmode_packets)
-    
-    # create the time dictionary
-    time_dict = {}
+            events = events_all[_indices]
+            events_time = events_time_all[_indices]
 
-    # find start time
-    if time_low and time_low in time_at_markers:
-        start = np.where(time_at_markers==time_low)[0][0]
-    else:    
-        start = 0
-    
-    # find end time
-    if time_high and time_high in time_at_markers:
-        stop = np.where(time_at_markers==time_high)[0][0]
-    else:    
-        stop = len(time_at_markers) - 1      
-    
-    # define time range
-    time_range = range(start,stop,1)
-    
-    # fill the dictionary
-    for i in time_range:
-        time_ms = time_at_markers[i]
-        time_dict[time_ms] = get_bin_addresses_from_packets(listmode_timeslices[i])
+        except:
+            raise Exception("listmode: Failed to filter events with time_range = {} ".format(time_range)) 
+    else:
+        _indices = np.arange(len(events_time_all))
+        events_time = events_time_all
+        events = events_all
         
     if verbose:
-        print("Time dictionary created, length = ", len(time_dict))
-        
-    return time_dict    
-
+        if time_range != None:
+            print("time range for event selection =", time_range, " => ", list(time_range))
+        else:
+            print("time_range = None, i.e. no limitation on selected events")
+        print("indices =", _indices, " length =", len(_indices))
+        print("events =", events, " length =", len(events))
+        print("events time =", events_time, " length =", len(events_time))
+                
+    return events, events_time, _indices
 #----------------------------------------------------    
-def get_timestamp_from_ba_in_dict(time_dict, ba):
-    """
-    input: 
-    time_dict:  dictionary of time markers [ms], with an array of bin addresses for each time marker
-    ba:         the bin address to find the time marker for
-    output:   
-    ba_time:    the time marker [ms] for the bin address, if not found in time_dict ba_time = -1
-    """
-    
-    for i in range(0,len(time_dict)):
-        res = np.where(time_dict[i] == ba)
-        if len(res)>0 and len(res[0])>0:
-            return i
-            
-    return -1    
+def create_unraveled_histogram_from_packets(listmode_packets, histogram_shape, order='C', dtype=np.uint32, verbose=False):
+    bin_addresses = get_bin_addresses_from_packets(listmode_packets, verbose=False);
+    histogram_1D = np.zeros(np.prod(histogram_shape), dtype=dtype)
+    np.add.at(histogram_1D, bin_addresses, 1)
+    histogram_unraveled = np.reshape(histogram_1D, histogram_shape, order=order)
+    if verbose:
+        print("created {}D histogram with shape = {} ".format(len(histogram_shape), histogram_shape))
+    return histogram_unraveled

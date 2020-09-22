@@ -16,7 +16,7 @@ import numpy as np
 # add a limit to the number of lines printed to screen
 max_num_lines = 10000
 
-def list_lm_events(hdr_path, num_rows=1000, comp_from_hdr=True, time_low=None, time_high=None, verbose=True, stir_output_file=None):
+def list_lm_events(hdr_path, num_rows=1000, comp_from_hdr=True, time_range=None, verbose=True, stir_output_file=None):
     """
     input: 
     hdr_path: the header file with path
@@ -30,41 +30,39 @@ def list_lm_events(hdr_path, num_rows=1000, comp_from_hdr=True, time_low=None, t
     # import listmode packets based on header file
     listmode_datastruct = dataimport.import_data_from_hdr(hdr_path, verbose=verbose)
     
-    listmode_params = listmode_datastruct.params
     # print general info
-    print_general_information(listmode_params, verbose)    
+    print_general_information(listmode_datastruct.params, verbose)    
 
-    listmode_packets = listmode_datastruct.packets 
-    # get the events from the packets
-    events = listmode.get_events_from_packets(listmode_packets, verbose)
-    # create events_time array, i.e. array with elapsed time for each event
-    events_time = listmode.create_events_time_array_from_packets(listmode_packets, verbose)
+    # create arrays of events and events_time from the packets, i.e. arrays with events and elapsed time for each event, respectively.
+    events, events_time, indices = listmode.create_events_time_arrays_from_packets(listmode_datastruct.packets, time_range=time_range, verbose=verbose)
     
-    # get the compression object, used e.g. to calculate crystal pairs
-    # the mashing is not handled correctly this way, seems to assume span=1
+    # add events etc to datastruct
+    listmode_datastruct.time_range = time_range
+    listmode_datastruct.events = events
+    listmode_datastruct.events_time = events_time
+    
+    # create the compression object, used e.g. to calculate crystal pairs
     print("Creating the compression using odlpet 'Compression'")
-    compression = Compression.from_stir_scanner_name(listmode_params.scanner_system) 
+    compression = Compression.from_stir_scanner_name(listmode_datastruct.params.scanner_system) 
+    # the mashing is not handled correctly when created this way, seems to assume span=1
     # therefore, to get the correct span etc, update compression object from header data
     if comp_from_hdr: # this is default 
         print("Updating the compression object using 'header_extractor.compression_from_hdr'")
-        compression = header_extractor.compression_from_hdr(str(listmode_params.hdr_path), compression_obj = compression, verbose = False)
-         
+        compression = header_extractor.compression_from_hdr(str(listmode_datastruct.params.hdr_path), compression_obj = compression, verbose = False)
+    
+    # check how many lines to print
     if num_rows:
-        range_end = num_rows
         print("printing will limited to {} rows".format(num_rows))
     else:
-        range_end = len(events)
-        if range_end < max_num_lines:
-            print("printing is not limited, all {} rows will be printed".format(range_end))
+        num_rows = len(events)
+        if num_rows < max_num_lines:
+            print("printing is not limited, all {} rows will be printed".format(num_rows))
         else:
             print("printing will be limited to {} rows".format(max_num_lines))
-            range_end = max_num_lines
+            num_rows = max_num_lines            
             
-    _time = -1        
-    for k in range(0, range_end):
-        if events_time is not None:
-            _time = events_time[k]
-        print_listmode_event_full_description(k, events[k], listmode_params, _time, compression)
+    for k in range(0, num_rows):
+        print_listmode_event_full_description(k, indices[k], events[k], events_time[k], listmode_datastruct.params, compression)
         
     return listmode_datastruct, compression
     
@@ -90,7 +88,7 @@ def print_general_information(params, verbose = True):
         
 
 #----------------------------------------------------        
-def print_listmode_event_full_description(idx, event, _params, time_marker=-1, _compression=None):
+def print_listmode_event_full_description(line_idx, event_idx, event, time_marker, _params, _compression=None):
     
     if not _params.is_listmode:
         raise Exception("print_listmode_event_full_description is meant for listmode data")
@@ -110,8 +108,9 @@ def print_listmode_event_full_description(idx, event, _params, time_marker=-1, _
     else:
         prompt_or_delay = "d"
 
-    print(50*"=")        
-    print("event index:", idx)
+    print(50*"=") 
+    print("line index:", line_idx)
+    print("event index:", event_idx)
     if (time_marker >= 0): print("time_marker:",time_marker)
     print("bin_address: ", listmode.get_bin_address_from_packet(event))
     print("np.unravel bin address:", TOF_LOR)
@@ -121,15 +120,15 @@ def print_listmode_event_full_description(idx, event, _params, time_marker=-1, _
     if not _compression:
         print(50*"=")      
     else:
-        actual_angle, radial_offset, crystal_pair_avg = detector_pair.get_crystal_pair_avg(angle_num, radial_num, _compression)  
         actual_angles, radial_offset2, crystal_pair_all = detector_pair.get_crystal_pair_all(angle_num, radial_num, _compression)  
+        actual_angle, radial_offset, crystal_pair_avg = detector_pair.get_crystal_pair_avg(angle_num, radial_num, _compression)  
         ring_sum, ring_diff, ring_pair = detector_pair.get_ring_pair(_params.segment_table, sino_num, _params.span)
-        print("angle num: {} => uncompressed to {}".format(angle_num, actual_angle))
-        print("radial num: {} => radial position {}".format(radial_num, radial_offset))
+        print("angle num: {} => uncompressed to {}".format(angle_num, actual_angles))
+        print("radial num: {} => radial position {}".format(radial_num, radial_offset2))
         print("crystal_pair (average):", crystal_pair_avg)
         print("crystal_pairs (all):", crystal_pair_all)
     
-        print("rings:",ring_pair)
+        print("ring_sum: {}, ring_diff: {}, ring_pairs: {}".format(ring_sum, ring_diff, ring_pair))
     
         #Coincidence p (c:15,r:33,l:0)-(c:283,r:22,l:0)
         for cp in crystal_pair_all:
@@ -138,8 +137,10 @@ def print_listmode_event_full_description(idx, event, _params, time_marker=-1, _
         if tof_bin: # if time of flight, make sure all delayeds are in the tof bin
             if listmode.is_event_prompt(event):
                 assert tof_bin < _params.num_TOF_bins, " tof bin = {}, prompt must be in one of the tof bins".format(tof_bin)
-            else:
+            elif listmode.is_event_delayed(event):
                 assert tof_bin == _params.num_TOF_bins, " tof bin = {}, delayeds must be in bin nr num_TOF_bins+1, i.e. with index num_TOF_bins".format(tof_bin)
+            else:
+                print("event is neither prompt nor delayed?")
             
         print(50*"=")        
     

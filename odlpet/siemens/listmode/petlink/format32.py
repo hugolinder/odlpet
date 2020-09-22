@@ -154,6 +154,7 @@ GANTRY_MOTION_POSITION_TAG = MOTION_TAG
 MONITORING_TAG = packet_part(31-3, 31, 0b1110)
 CONTROL_TAG = packet_part(31-3, 31, 0b1111)
 #   3.2 event packet
+DELAYED = packet_part(30, 30, 0)
 PROMPT = packet_part(30, 30, 1)
 BIN_ADDRESS = packet_part(0, 29)
 #   skip SPECT event packet (obsolete)
