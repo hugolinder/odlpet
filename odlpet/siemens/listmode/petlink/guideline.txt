@@ -1,2 +1,164 @@
-# the PETLink text that defines the different packet names and the ranges and descriptions of their parts 
-# It would be nice to use the original pdf
+[section] 0. Hugo comments
+# This is the PETLink text that defines the different packet names and the ranges and descriptions of their parts 
+# It would be nice to use the original guideline pdf, although this seems a bit complicated. Currently I copied manually select parts from the pdf.
+# currently, it seems that some definitions are within sections, and only defined once. This requires some memory of previous packages when parsing. 
+# the text is separated into meaningful chunks by using [chunk]
+# I decided to represent the subsubsections of section 3 as sections.
+# Hugo Linder, hugoli@kth.se
+[section] 1. Hardware interfaces
+[section] 2. 64-bit Packet Format
+[subsection] 2.1 Following is a 64-bit packet format for detector pair and tag packets:
+[subsection] 2.2 Following is a 64-bit packet format for absolute bin address and tag packets:
+[section] 3. 32-Bit Packet Format
+[subsection] 3.1 Overview
+[packet] Basic
+TXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+T = Tag Bit (1-Tag/0-Event)
+X = Not Restricted
+[packet] Event Packet (Not a Tag Packet)
+0XXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+[packet] TAG 1: Time Marker/ Dead-Time Tracking
+10XX XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+[packet] TAG 2: Gantry Motions & Positions
+110X XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+[packet] TAG 3: Patient Monitoring: (Gating/Physiological/Head Tracking)
+1110 XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+[packet] TAG 4: Control / Acquisition Parameters
+1111 XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+[subsection] 3.2 32-Bit Packet Format Details
+[packet] PET Bin-Address Event Packet
+0PBB BBBB BBBB BBBB BBBB BBBB BBBB BBBB
+  |29                                0|
+P: Prompt (1 - Prompt; 0 - Delay)
+B: Bin Address: 0-29.
+Note that older PET systems (< 1998?) designated bit 29 (i.e. B29) as a Transmission/Window(W) bit.
+[packet] SPECT Event Packet (Obsolete)
+0uuu uuuH XXXX XXXh SYYY YYYY EEEE EEEE
+          |6    0|   |6    0| |7     0|
+u: Undefined (Default: Set to zero.) 
+H: Head Index (A=0;B=1) 
+X: Transaxial Xtal Index: 0-6 
+h: Hit bit (always = 1)
+S: Shape bit (Decay: Fast =1 / Slow = 0)
+Y: Axial Xtal Index: 0-6
+E: Energy Index: 0-7
+[subsection]3.2.1 TAG 1: Elapsed Time Marker/Dead-Time Tracking (Most Significant Nibble = 10uu)
+[packet] Elapsed Time Marker
+100M MMMM MMMM MMMM MMMM MMMM MMMM MMMM
+   |28                               0|
+M: Elapsed milliseconds: 0-28
+[packet] Dead-Time Tracking (Legacy Block Singles)
+101B BBBB BBBB BSSS SSSS SSSS SSSS SSSS
+   |9         0||18                  0|
+B: Block Number : 0-9
+S: Singles per second (per 0.25 sec. May-02; per 0.125 sec. Aug-07): 0-18
+Note: Originally this 19-bit S field was defined to represent singles per second. As of May 2002, a change was implemented by Siemens/CTI to down shift by 2 bits the singles/sec value prior to loading into this field – making the S value represent Singles/quarter-second. To get a value in Singles/sec, simply up shift the S value by 2 bits – i.e. multiply by 4. This down shift was done in order to extend the top-end range supported by this 19 bit field. In other words, later versions of the blocks began to effectively detect more than 500k Singles/sec. This 2-bit-down shift allowed support for singles/sec rates for each block as high as 2.1 M/sec and with a negligible loss in precision. As of August 2007 and along similar lines, another change was implemented by Siemens for some later version systems to instead down shift by 3 bits. So for those later version systems to get a Singles/sec value from the S field, multiply S by 8.
+[subsection] 3.2.3 TAG 3: Patient Monitoring: (Gating/Physiological/Head Tracking)
+(Most Significant Nibble = 1110)
+[packet] Basic Gating/Physiological Format
+1110 0EEE uuuu uuuu uuuu uuuu uuuu uuuu
+      210
+u: Undefined (Default: Set to zero.)
+E: Expansion Format Control: 0-2. [See 3 E-field bits labelled by “210” above.]
+[packet] Expanded Format #0 (Legacy)
+1110 0000 rrrr rrrr rrrr rrrr GGGG GGGG
+      210                     |7     0|
+r: Reserved. (Default: Set to zero.)
+G: Gating: 0-7
+E: Expansion Format Control: 0-2. (The 3-bit E field is set to 0 – as shown.)
+Here is a refinement of the Gating byte usage – i.e. the set-of-8 G bits shown above:
+CPDD DDDD
+  |5   0|
+where:
+D: Physiological Data (e.g. Respiratory Phase) Field: 0-5
+D content only has validity if flag bit P=1.
+P: Physiological (e.g. Respiratory) Flag Bit – High True.
+C: Cardiac “R Wave” Flag Bit – High True. This bit is intended to be the primary trigger control
+for driving the automatic FPGA-driven Gating Buffer switching in designs such as the Smart
+DRAM. [Note: Smart DRAM was an alternate hardware architecture for PET data acquisition
+that was considered (~2003) but one that did not go into production.]
+Example Format #0 32-bit Cardiac R-wave Tag packet commonly used on HiRez: E000 0080 (hex)
+[packet] Expanded Format #1 (Gating)
+1110 0001 rrrr rrrr GGGG GGGG GGGG GGGG
+      210           |15              0|
+r: Reserved. (Default: Set to zero.)
+G: Gating: 0-15
+E: Expansion Format Control: 0-2. (The 3-bit E field is set to 1 – as shown.)
+This is the proposed usage format for Gating Tag Packet usage – i.e. the set-of-16 G bits shown above:
+CPPP rrDD DDDD DDDD
+ 210   |9        0|
+where:
+D: Physiological Data Field: 0-9
+D field content only has validity if P field content is nonzero.
+r: Reserved. (Default: Set to zero.)
+P: Physiological Type Field: 0-2 [See 3 P-field bits labelled by “210” above.]
+P field value (0 – 7; one of eight) indicates type of D field content.
+Guidelines: P = 0 indicates D field has no valid content. (Default value for P.)
+P = 2 indicates R Wave Triggers from multiple ECG devices identified by D - e.g. MR-PET.
+D = 0 indicates "primary" R Wave Trigger - e.g. MR-supplied ECG.
+D = 1 indicates "secondary" R Wave Trigger - e.g. MR-supplied Oxygen
+Probe.
+D = 2 indicates "tertiary" R Wave Trigger - e.g. customer-supplied ECG
+P = 1 indicates Respiratory Trigger Content in D.
+[For mMR: D=0 for Gate On. D=1 for Gate Off.]
+P = 5 indicates Respiratory Phase/Waveform Content in D.
+P = 6 indicates Cardiac Phase/Waveform Content in D.
+C: Cardiac “R Wave” Flag Bit – High True. This bit is intended to be the primary trigger control
+for driving the automatic FPGA-driven Gating Buffer switching in designs such as the Smart
+DRAM. The intent is for the C bit to only be set = 1 when both the P field = 0 and the D field
+= 0. Also, the intent is for this C bit to only be set = 1 for single ECG environments. For
+multiple ECG environments - e.g. MR-PET, see P=2 above.
+Example Format #1 32-bit Cardiac R-wave Tag packet commonly used on mCT: E100
+8000(hex)
+[packet] Expanded Format #2 (Generic Trigger)
+1110 0010 rrrr rrrr TTTT TTTT TTTT TTTT
+      210           |15              0|
+r: Reserved. (Default: Set to zero.)
+T: Generic Trigger Field: 0-15
+E: Expansion Format Control: 0-2. (The 3-bit E field is set to 2 – as shown.)
+The purpose of this proposed Generic Trigger tag-packet format is to support generic requirements for
+stream marking. These Generic Trigger packets are intended to be used to mark the stream for generic
+events or with generic data. For example:
+1. the patient pushes a button (once or many times) such as to quickly generate an inserted tag packet
+with the 16-bit T15:0 field = 0;
+and/or
+2. the technician pushes a button (once or many times) such as to quickly generate an inserted tag
+packet with the 16-bit T15:0 field = 1;
+etc.
+Note that this Generic Trigger tag packet should not be confused with the TAG 4 Acquisition Flag packet.
+
+[packet] Expanded Formats #3 - #6 (Reserved)
+Expanded Format #7 (Special Research)
+1110 0111 rrrr rrrr SSSS SSSS SSSS SSSS
+      210 |15                        0|
+r: Reserved. (Default: Set to zero.)
+S: Special Research Field: 0-15
+E: Expansion Format Control: 0-2. (The 3-bit E field is set to 7 – as shown.)
+The purpose of this proposed Special Research tag-packet format is to support “special” requirements for research-oriented stream marking. These Special Research packets are intended to be used to mark the stream for special events or with unusual data. For example:
+1. patient blood pressure monitoring generates an inserted tag packet with the two-bit S15:14 field
+set to 1 and the 14-bit S13:0 field set to represent the current BP reading;
+and/or
+2. patient temperature monitoring generates an inserted tag packet with the two-bit S15:14 field set to 2 and the fourteen-bit S13:0 field set to represent the current temperature reading.
+etc.
+The intent is to allow individual PET researchers the freedom and opportunity to employ this specific-yet flexible tag-packet format – i.e. a format for marking the event stream with as-yet-unidentified time-critical information. Note that this Special Research tag packet should not be confused with the TAG 4 Acquisition Flag packet.
+
+[subsection] 3.2.4 TAG 4: Control & Acquisition Parameters (Most Significant Nibble = 1111)
+[packet] TAG 4: Basic Acquisition Flag Format
+1111 1111 CCCC CCCC IIII IIII IIII IIII
+|31                                  0|
+1111 Bits 31- 28. Most Significant Nibble is Header defined by PETLINK to indicate TAG 4
+packet.
+1111 Bits 27 - 24. Second Most Significant Nibble is the Type field for TAG 4 packet. Set to
+F(hex) for “Flag”.
+C Bits 23 - 16. Check sum. Sum of 3 other bytes in this 32-bit packet. The inserter of the packet
+is responsible for calculating and including the content of this check sum field.
+The reader of this packet is responsible for confirming that the check sum value
+is consistent with the whole 32-bit packet before accepting this packet as valid.
+Here are four example 32-bit Flag Tag packets in hex with correct check sum:
+TAG 4 (F); Type (F); CS (FF) [FF+00+00=FF]; ID (0000); FFFF0000
+TAG 4 (F); Type (F); CS (00) [FF+00+01=100 or 00]; ID (0001); FF000001
+TAG 4 (F); Type (F); CS (01) [FF+00+02=101 or 01]; ID (0002); FF010002
+TAG 4 (F); Type (F); CS (45) [FF+12+34=145 or 45]; ID (1234); FF451234
+I Bits 15 – 0. Flag Identification Field.
+Note that the usual techniques may be employed to contain this 32-bit (TW) tag field within a 64-bit
+packet. Here are some rough suggestions and comments about the use of the I field:

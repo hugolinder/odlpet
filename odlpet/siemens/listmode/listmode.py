@@ -96,7 +96,7 @@ def get_delayeds_from_packets(listmode_packets, verbose=False):
     
     # get delayed    
     listmode_events = get_events_from_packets(listmode_packets, False)
-    is_delayed = petlink32.DELAYED.compare(listmode_events)
+    is_delayed = petlink32.DELAY.compare(listmode_events)
     listmode_delayeds = listmode_events[is_delayed]
             
     if verbose:
@@ -163,7 +163,7 @@ def is_event_delayed(listmode_event):
         raise TypeError("listmode.is_event_delayed called with non-event packet")
     
     # returr if delayed or not
-    return petlink32.DELAYED.compare(listmode_event)
+    return petlink32.DELAY.compare(listmode_event)
 #----------------------------------------------------    
 def is_event(listmode_event):
     """
