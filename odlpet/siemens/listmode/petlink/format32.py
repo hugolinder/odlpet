@@ -39,8 +39,9 @@ VERTICAL_BED_POSITION = PacketPart(0, 14) # unknown units
 #   skip source axial position and rotation, page 9
 #   skip HRRT single photon source position
 #   skip 3.2.3
-BASIC_GATING = PacketPart(31-4, 32, 0b11100)
-BASIG_GATING_EXPANSION_FORMAT_CONTROL = PacketPart(31-7,31-4)
+BASIC_GATING = PacketPart(32-5, 32, 0b11100)
+BASIG_GATING_EXPANSION_FORMAT_CONTROL = PacketPart(32-5-3,32-5, name = "E")
+BASIC_GATING_PACKET = PacketFormat(parts=[BASIC_GATING, PacketPart(32-5-3,32-5, name = "E"), PacketPart(0, 32-5-3, name = "E")])
 BASIC_GATING_E0_G = PacketPart(0, 8)
 BASIC_GATING_E0_D = PacketPart(0, 6) 
 # Physiological Data (e.g. Respiratory Phase) Field: 0-5. 
