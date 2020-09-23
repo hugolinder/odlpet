@@ -22,7 +22,7 @@ class PacketFormat:
         result = True
         for part in self.parts:
             if part.value is not None:
-                result = part.compare(packet) == result
+                result *= part.compare(packet)
         return result
 
     def evaluate(self, packet):
